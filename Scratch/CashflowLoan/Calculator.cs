@@ -66,7 +66,7 @@ public class AccountingBasedUnderwriting
         }
 
         // Calculate key health metrics
-        decimal currentRatio = metrics.CurrentAssets / metrics.CurrentLiabilities;
+        var currentRatio = metrics.CurrentAssets / metrics.CurrentLiabilities;
         if (currentRatio < MIN_CURRENT_RATIO)
         {
             rejectionReasons.Add("Current ratio below minimum threshold");
@@ -78,17 +78,17 @@ public class AccountingBasedUnderwriting
         }
 
         // Calculate maximum loan amount based on multiple approaches
-        decimal[] loanAmounts = CalculatePotentialLoanAmounts(metrics);
-        decimal maxLoan = loanAmounts.Min(); // Most conservative amount
+        var loanAmounts = CalculatePotentialLoanAmounts(metrics);
+        var maxLoan = loanAmounts.Min(); // Most conservative amount
 
         // Determine repayment schedule type
         var scheduleType = DetermineOptimalRepaymentSchedule(metrics);
 
         // Calculate risk-adjusted interest rate
-        decimal baseRate = CalculateBaseInterestRate(metrics);
+        var baseRate = CalculateBaseInterestRate(metrics);
 
         // Calculate recommended percentage of revenue/cash flow for repayment
-        decimal repaymentPercentage = CalculateRepaymentPercentage(metrics, maxLoan, scheduleType);
+        var repaymentPercentage = CalculateRepaymentPercentage(metrics, maxLoan, scheduleType);
 
         return new LoanOffer
         {
@@ -104,21 +104,21 @@ public class AccountingBasedUnderwriting
     private decimal[] CalculatePotentialLoanAmounts(AccountingMetrics metrics)
     {
         // 1. Cash Flow Based Approach
-        decimal avgMonthlyCashFlow = metrics.MonthlySnapshots.Average(x => x.OperatingCashFlow);
-        decimal cashFlowBasedAmount = avgMonthlyCashFlow * 6; // 6 months of operating cash flow
+        var avgMonthlyCashFlow = metrics.MonthlySnapshots.Average(x => x.OperatingCashFlow);
+        var cashFlowBasedAmount = avgMonthlyCashFlow * 6; // 6 months of operating cash flow
 
         // 2. Working Capital Approach
-        decimal currentWorkingCapital = metrics.CurrentAssets - metrics.CurrentLiabilities;
-        decimal targetWorkingCapital = (metrics.MonthlySnapshots.Average(x => x.Revenue) / 30) * TARGET_WORKING_CAPITAL_DAYS;
-        decimal workingCapitalGap = Math.Max(targetWorkingCapital - currentWorkingCapital, 0);
+        var currentWorkingCapital = metrics.CurrentAssets - metrics.CurrentLiabilities;
+        var targetWorkingCapital = (metrics.MonthlySnapshots.Average(x => x.Revenue) / 30) * TARGET_WORKING_CAPITAL_DAYS;
+        var workingCapitalGap = Math.Max(targetWorkingCapital - currentWorkingCapital, 0);
 
         // 3. Revenue Multiple Approach
-        decimal annualRevenue = metrics.MonthlySnapshots.Average(x => x.Revenue) * 12;
-        decimal revenueBasedAmount = annualRevenue * 0.2m; // 20% of annual revenue
+        var annualRevenue = metrics.MonthlySnapshots.Average(x => x.Revenue) * 12;
+        var revenueBasedAmount = annualRevenue * 0.2m; // 20% of annual revenue
 
         // 4. Debt Service Capacity
-        decimal monthlyFreeCashFlow = avgMonthlyCashFlow - metrics.ExistingDebtPayments;
-        decimal debtServiceBasedAmount = (monthlyFreeCashFlow * 12 * MAX_DEBT_SERVICE_RATIO) / 0.15m; // Assuming 15% annual cost
+        var monthlyFreeCashFlow = avgMonthlyCashFlow - metrics.ExistingDebtPayments;
+        var debtServiceBasedAmount = (monthlyFreeCashFlow * 12 * MAX_DEBT_SERVICE_RATIO) / 0.15m; // Assuming 15% annual cost
 
         return new[] { cashFlowBasedAmount, workingCapitalGap, revenueBasedAmount, debtServiceBasedAmount };
     }
@@ -126,17 +126,17 @@ public class AccountingBasedUnderwriting
     private RepaymentSchedule DetermineOptimalRepaymentSchedule(AccountingMetrics metrics)
     {
         // Check for seasonality
-        bool hasSeasonality = DetectSeasonality(metrics.MonthlySnapshots);
+        var hasSeasonality = DetectSeasonality(metrics.MonthlySnapshots);
         if (hasSeasonality)
             return RepaymentSchedule.SeasonallyAdjusted;
 
         // Check cash flow stability
-        decimal cashFlowVariability = CalculateCashFlowVariability(metrics.MonthlySnapshots);
+        var cashFlowVariability = CalculateCashFlowVariability(metrics.MonthlySnapshots);
         if (cashFlowVariability > 0.3m)
             return RepaymentSchedule.FixedPercentageOfRevenue;
 
         // Check working capital efficiency
-        decimal workingCapitalTurnover = CalculateWorkingCapitalTurnover(metrics.MonthlySnapshots);
+        var workingCapitalTurnover = CalculateWorkingCapitalTurnover(metrics.MonthlySnapshots);
         if (workingCapitalTurnover > 6) // High efficiency
             return RepaymentSchedule.FixedPercentageOfCashFlow;
 
@@ -145,21 +145,21 @@ public class AccountingBasedUnderwriting
 
     private decimal CalculateBaseInterestRate(AccountingMetrics metrics)
     {
-        decimal baseRate = 0.08m; // Start with 8% base rate
+        var baseRate = 0.08m; // Start with 8% base rate
 
         // Adjust for customer concentration risk
         if (metrics.TopCustomerRevenuePercentage > 0.2m)
             baseRate += 0.02m;
 
         // Adjust for AR quality
-        decimal badARPercentage = metrics.AccountsReceivable
+        var badARPercentage = metrics.AccountsReceivable
             .Where(x => x.DaysRange > 90)
             .Sum(x => x.Amount) / metrics.AccountsReceivable.Sum(x => x.Amount);
         if (badARPercentage > 0.1m)
             baseRate += 0.015m;
 
         // Adjust for operating margins
-        decimal avgOperatingMargin = metrics.MonthlySnapshots.Average(x =>
+        var avgOperatingMargin = metrics.MonthlySnapshots.Average(x =>
             (x.Revenue - x.OperatingExpenses) / x.Revenue);
         if (avgOperatingMargin > 0.15m)
             baseRate -= 0.01m;
@@ -198,8 +198,8 @@ public class AccountingBasedUnderwriting
             .OrderBy(x => x.Month)
             .ToList();
 
-        decimal overall_avg = monthlyAverages.Average(x => x.AvgRevenue);
-        int significant_variations = monthlyAverages
+        var overall_avg = monthlyAverages.Average(x => x.AvgRevenue);
+        var significant_variations = monthlyAverages
             .Count(x => Math.Abs(x.AvgRevenue - overall_avg) / overall_avg > 0.2m);
 
         return significant_variations >= 4; // If 4+ months show >20% variation from mean
@@ -208,16 +208,16 @@ public class AccountingBasedUnderwriting
     private decimal CalculateCashFlowVariability(List<FinancialSnapshot> snapshots)
     {
         var cashFlows = snapshots.Select(x => x.OperatingCashFlow).ToList();
-        decimal avg = cashFlows.Average();
-        decimal variance = cashFlows.Sum(x => Math.Pow((double)(x - avg), 2)) / cashFlows.Count;
-        decimal stdDev = (decimal)Math.Sqrt((double)variance);
+        var avg = cashFlows.Average();
+        var variance = cashFlows.Sum(x => Math.Pow((double)(x - avg), 2)) / cashFlows.Count;
+        var stdDev = (decimal)Math.Sqrt((double)variance);
         return stdDev / avg; // Coefficient of variation
     }
 
     private decimal CalculateWorkingCapitalTurnover(List<FinancialSnapshot> snapshots)
     {
-        decimal avgRevenue = snapshots.Average(x => x.Revenue);
-        decimal avgWorkingCapital = snapshots.Average(x => x.WorkingCapital);
+        var avgRevenue = snapshots.Average(x => x.Revenue);
+        var avgWorkingCapital = snapshots.Average(x => x.WorkingCapital);
         return avgWorkingCapital != 0 ? (avgRevenue * 12) / avgWorkingCapital : 0;
     }
 }

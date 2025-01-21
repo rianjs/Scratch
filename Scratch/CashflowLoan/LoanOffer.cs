@@ -8,5 +8,5 @@ public record LoanOffer
     public decimal RepaymentPercentage { get; init; }
     public bool IsApproved { get; init; }
     public List<string> RejectionReasons { get; init; }
-    public AccountingBasedUnderwriting.RepaymentScheduleType RecommendedSchedule { get; init; }
+    public RepaymentSchedule RecommendedSchedule { get; init; }
 }

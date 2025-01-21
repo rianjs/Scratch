@@ -4,39 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-public record Transaction
+public class RecurrenceCalculator
 {
-    public DateOnly Date { get; init; }
-    public required string OriginalDescription { get; init; }
-    public required decimal Amount { get; init; }
-    public required string DebitCredit { get; init; }
-    public required string Category { get; init; }
-    public required string Account { get; init; }
-    public string? Labels { get; init; }
-    public string? Notes { get; init; }
-
-    public override string ToString()
-    {
-        var descLimit = Math.Min(16, OriginalDescription.Length);
-        return $"{Date:O} - {Amount:C} - {OriginalDescription[..descLimit]} ({Category})";
-    }
-}
-
-public record RecurringPattern
-{
-    public string Description { get; init; }
-    public TimeSpan AverageInterval { get; init; }
-    public decimal AverageAmount { get; init; }
-    public List<Transaction> Transactions { get; init; }
-    public double IntervalConsistency { get; init; } // 0 to 1, higher is more consistent
-    public double AmountConsistency { get; init; }   // 0 to 1, higher is more consistent
-}
-
-public class RecurringTransactionAnalyzer
-{
-    private readonly decimal[] _amountThresholds = [100m, 1000m, 10000m];
-    private readonly decimal[] _variationThresholds = [10m, 50m, 500m];
-
     private readonly TimeSpan[] _commonIntervals =
     [
         TimeSpan.FromDays(7),      // Weekly
@@ -47,14 +16,22 @@ public class RecurringTransactionAnalyzer
         TimeSpan.FromDays(365.25), // Annually
     ];
 
+    private readonly int _matchThreshold;
+    private readonly double _deviationCeiling;
+    public RecurrenceCalculator(int matchThreshold, double deviationCeiling)
+    {
+        _matchThreshold = matchThreshold;
+        _deviationCeiling = deviationCeiling;
+    }
+
     public List<RecurringPattern> AnalyzeTransactions(List<Transaction> transactions)
     {
         var patterns = transactions
             .OrderBy(t => t.Date)
             .GroupBy(t => t.OriginalDescription)
-            .Where(g => g.Count() >= 3)
+            .Where(g => g.Count() >= _matchThreshold)
             .SelectMany(g => IdentifyPatterns(g.ToList()))
-            .OrderByDescending(p => p.IntervalConsistency * Convert.ToDouble(p.AmountConsistency))
+            .OrderByDescending(p => p.IntervalConsistency * p.AmountConsistency)
             .ToList();
 
         return patterns;
@@ -81,18 +58,23 @@ public class RecurringTransactionAnalyzer
             // Group transactions that fit this interval pattern
             var matchingTransactions = FindTransactionsMatchingInterval(sortedTransactions, interval);
 
-            if (matchingTransactions.Count >= 3)
+            if (matchingTransactions.Count >= _matchThreshold)
             {
-                var averageAmount = matchingTransactions.Average(t => t.Amount);
+                var meanAmount = matchingTransactions.Average(t => t.Amount);
 
                 // Check if amounts are within acceptable variation
-                if (AreAmountsConsistent(matchingTransactions, averageAmount))
+                if (AreAmountsConsistent(matchingTransactions, meanAmount))
                 {
                     patterns.Add(new RecurringPattern
                     {
                         Description = sortedTransactions[0].OriginalDescription,
-                        AverageInterval = interval,
-                        AverageAmount = averageAmount,
+                        OriginalDescriptions = sortedTransactions
+                            .Select(t => t.OriginalDescription)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+                        MeanInterval = interval,
+                        MeanAmount = meanAmount,
                         Transactions = matchingTransactions,
                         IntervalConsistency = CalculateIntervalConsistency(matchingTransactions),
                         AmountConsistency = CalculateAmountConsistency(matchingTransactions)
@@ -107,26 +89,26 @@ public class RecurringTransactionAnalyzer
     private List<TimeSpan> FindCommonIntervals(List<TimeSpan> intervals)
     {
         var result = new List<TimeSpan>();
-        var averageInterval = TimeSpan.FromDays(intervals.Average(i => i.TotalDays));
+        var meanInterval = TimeSpan.FromDays(intervals.Average(i => i.TotalDays));
 
         // Check each common interval to see if it matches the pattern
         foreach (var commonInterval in _commonIntervals)
         {
             // Calculate how well this interval matches the observed intervals
-            var deviations = intervals.Select(interval =>
-                Math.Abs((interval.TotalDays - commonInterval.TotalDays) / commonInterval.TotalDays));
+            var meanDeviation = intervals
+                .Select(interval => Math.Abs((interval.TotalDays - commonInterval.TotalDays) / commonInterval.TotalDays))
+                .Average();
 
-            // If the average deviation is less than 20%, consider this a potential match
-            if (deviations.Average() < 0.2)
+            if (meanDeviation < _deviationCeiling)
             {
                 result.Add(commonInterval);
             }
         }
 
         // If no common intervals match well, add the averaged actual interval
-        if (!result.Any())
+        if (result.Count == 0)
         {
-            result.Add(averageInterval);
+            result.Add(meanInterval);
         }
 
         return result;
@@ -156,38 +138,38 @@ public class RecurringTransactionAnalyzer
         return result;
     }
 
+    /// <summary>
+    /// Returns the interval tolerance for a interval. Longer intervals allow for more tolerance, e.g. 1 day for weekly,
+    /// 2 days for bi-weekly, etc.
+    /// </summary>
     private double GetIntervalTolerance(TimeSpan interval)
-    {
-        // Allow more tolerance for longer intervals: 1 day for weekly, 2 days for bi-weeklly, etc.
-        return interval.TotalDays switch
+        => interval.TotalDays switch
         {
             <= 7 => 1,
             <= 14 => 2,
-            <= 32 => 3,
+            <= 31 => 3,
             <= 100 => 7,
             <= 200 => 10,
             _ => 15,
         };
-    }
 
-    private bool AreAmountsConsistent(List<Transaction> transactions, decimal averageAmount)
+    private bool AreAmountsConsistent(List<Transaction> transactions, decimal meanAmount)
     {
-        var threshold = GetAmountThreshold(averageAmount);
-        return transactions.All(t => Math.Abs(t.Amount - averageAmount) <= threshold);
+        var tolerance = GetAmountThreshold(meanAmount);
+        return transactions.All(t => Math.Abs(t.Amount - meanAmount) <= tolerance);
     }
 
     private decimal GetAmountThreshold(decimal amount)
-    {
-        for (var i = 0; i < _amountThresholds.Length; i++)
+        => amount switch
         {
-            if (amount < _amountThresholds[i])
-            {
-                return _variationThresholds[i];
-            }
-        }
-
-        return _variationThresholds.Last();
-    }
+            < 100m => 10m,     // Up to $100: within $10 (~10% max variation)
+            < 500m => 25m,     // $100-500: within $25 (~5-25% variation)
+            < 1000m => 50m,    // $500-1000: within $50 (~5-10% variation)
+            < 2500m => 100m,   // $1000-2500: within $100 (~4-10% variation)
+            < 5000m => 250m,   // $2500-5000: within $250 (~5-10% variation)
+            < 10000m => 350m,  // $5000-10000: within $350 (~3.5-7% variation)
+            _ => 500m,         // $10000+: within $500 (<5% variation)
+        };
 
     private double CalculateIntervalConsistency(List<Transaction> transactions)
     {
@@ -196,7 +178,7 @@ public class RecurringTransactionAnalyzer
             return 0;
         }
 
-        var intervals = new List<double>();
+        var intervals = new List<double>(transactions.Count);
         for (var i = 1; i < transactions.Count; i++)
         {
             var intervalDays = transactions[i].Date.DayNumber - transactions[i - 1].Date.DayNumber;
