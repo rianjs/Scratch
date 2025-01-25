@@ -28,7 +28,7 @@ public class RecurrenceCalculator
     {
         var patterns = transactions
             .OrderBy(t => t.Date)
-            .GroupBy(t => t.OriginalDescription)
+            .GroupBy(t => t.Description)
             .Where(g => g.Count() >= _matchThreshold)
             .SelectMany(g => IdentifyPatterns(g.ToList()))
             .OrderByDescending(p => p.IntervalConsistency * p.AmountConsistency)
@@ -67,11 +67,11 @@ public class RecurrenceCalculator
                 {
                     patterns.Add(new RecurringPattern
                     {
-                        Description = sortedTransactions[0].OriginalDescription,
+                        Description = sortedTransactions[0].Description,
                         OriginalDescriptions = sortedTransactions
-                            .Select(t => t.OriginalDescription)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+                            .Select(t => t.Description)
+                            .Distinct(StringComparer.Ordinal)
+                            .OrderBy(t => t, StringComparer.Ordinal)
                             .ToList(),
                         MeanInterval = interval,
                         MeanAmount = meanAmount,

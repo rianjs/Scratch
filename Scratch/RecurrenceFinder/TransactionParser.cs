@@ -65,11 +65,11 @@ public static class TransactionParser
         fields.Add(currentField.ToString().Trim());
 
         var amount = decimal.Parse(fields[2]);
-        var isDebit = string.Equals(fields[3], "debit", StringComparison.OrdinalIgnoreCase);
+        var isDebit = string.Equals(fields[3], "debit", StringComparison.Ordinal);
         var t = new Transaction
         {
             Date = DateOnly.Parse(fields[0]),
-            OriginalDescription = fields[1],
+            Description = fields[1],
             Amount = isDebit
                 ? -amount
                 : amount,

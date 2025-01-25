@@ -1,8 +1,9 @@
-namespace RecurrenceFinder.EnsembleSimilarity;
+namespace RecurrenceFinder.Similarity;
 
 public interface ISimilarityCalculator
 {
     double CalculateJaccardSimilarityCoefficient(string left, string right);
+    double CalculateJaccardSimilarityCoefficient(HashSet<string> leftTokens, HashSet<string> rightTokens);
     HashSet<string> GenerateNgrams(string input, int chunkSize);
 
     /// <summary>
@@ -15,16 +16,23 @@ public interface ISimilarityCalculator
     /// <see href="https://stackoverflow.com/a/9454016" />
     /// <returns>Int.MaxValue if threshold exceeded; otherwise the Damerau-Levenshtein distance between the strings</returns>
     int CalculateDamerauLevenshteinDistance(string source, string target, int threshold = int.MaxValue);
+
+    double CalculateLevenshteinSimilarityRatio(string left, string right);
 }
 
 public class SimilarityCalculator : ISimilarityCalculator
 {
     public double CalculateJaccardSimilarityCoefficient(string left, string right)
     {
-        var leftTokens = left.Split(' ').ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var rightTokens = right.Split(' ').ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var union = leftTokens.Union(rightTokens).Count();
+        const StringSplitOptions splitOps = StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries;
+        var leftTokens = left.Split(' ', splitOps).ToHashSet(StringComparer.Ordinal);
+        var rightTokens = right.Split(' ', splitOps).ToHashSet(StringComparer.Ordinal);
+        return CalculateJaccardSimilarityCoefficient(leftTokens, rightTokens);
+    }
 
+    public double CalculateJaccardSimilarityCoefficient(HashSet<string> leftTokens, HashSet<string> rightTokens)
+    {
+        var union = leftTokens.Union(rightTokens).Count();
         if (union == 0)
         {
             return 0;
@@ -36,7 +44,7 @@ public class SimilarityCalculator : ISimilarityCalculator
 
     public HashSet<string> GenerateNgrams(string input, int chunkSize)
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i <= input.Length - chunkSize; i++)
         {
             result.Add(input.Substring(i, chunkSize));
@@ -135,5 +143,12 @@ public class SimilarityCalculator : ISimilarityCalculator
         return result > threshold
             ? int.MaxValue
             : result;
+    }
+
+    public double CalculateLevenshteinSimilarityRatio(string left, string right)
+    {
+        var distance = CalculateDamerauLevenshteinDistance(left, right, int.MaxValue);
+        var maxLength = Math.Max(left.Length, right.Length);
+        return 1 - Convert.ToDouble(distance) / maxLength;
     }
 }

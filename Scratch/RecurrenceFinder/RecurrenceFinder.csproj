@@ -7,4 +7,8 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Monit.Benchmarking.Utils" Version="3.0.68" />
+    </ItemGroup>
+
 </Project>

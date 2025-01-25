@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace RecurrenceFinder.EnsembleSimilarity;
+namespace RecurrenceFinder.Similarity;
 
 public interface ITransactionNormalizer
 {
@@ -9,18 +9,15 @@ public interface ITransactionNormalizer
 
 public partial class TransactionNormalizer : ITransactionNormalizer
 {
-    private const RegexOptions _normalizerOpts = RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.NonBacktracking;
+    private const RegexOptions _normalizerOpts = RegexOptions.IgnoreCase | RegexOptions.Singleline;
 
-    [GeneratedRegex(@"\b(DEBIT|CREDIT|PMT|PAYMENT|ACH)\b", _normalizerOpts)]
-    private static partial Regex TxnTypeMatch();
-
-    [GeneratedRegex(@"\d+(?!\d{0,3}$)", _normalizerOpts)]
+    [GeneratedRegex(@"(?<!\d)\d{1,4}(?!\d)", _normalizerOpts)]
     private static partial Regex DigitsMatch();
 
     [GeneratedRegex(@"\s+", _normalizerOpts)]
     private static partial Regex ConsolidateSpacesMatch();
 
-    private readonly Dictionary<string, string> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _cache = new(StringComparer.Ordinal);
 
     public string Normalize(string input)
     {
@@ -30,13 +27,16 @@ public partial class TransactionNormalizer : ITransactionNormalizer
         }
 
         // Basic normalization
-        var normalized = input.ToUpperInvariant()
-            .Replace("*", " ")
-            .Replace("-", " ")
-            .Replace(".", " ");
+        var normalized = input
+            // .Replace('-', ' ')
+            .Replace("-", "")
+            .Replace(',', ' ')
+            .Replace('#', ' ')
+            .Replace("\'", "")
+            .ToUpperInvariant();
 
         // Remove common payment suffixes
-        normalized = TxnTypeMatch().Replace(normalized, "");
+        // normalized = TxnTypeMatch().Replace(normalized, "");
 
         // Remove digits except trailing 4
         normalized = DigitsMatch().Replace(normalized, "");

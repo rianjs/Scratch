@@ -1,5 +1,5 @@
 using NUnit.Framework.Interfaces;
-using RecurrenceFinder.EnsembleSimilarity;
+using RecurrenceFinder.Similarity;
 
 namespace RecurrenceFinderTests.EnsembleSimilarity;
 
