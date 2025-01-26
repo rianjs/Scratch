@@ -27,9 +27,8 @@ var normalized = txns
     .Select(et => noiseAttenuator.Enrich(et))
     .ToList();
 
-var withAsterisks = normalized.Where(t => t.NormalizedDescription.Contains('*', StringComparison.Ordinal)).ToList();
-
-withAsterisks.ForEach(t => Console.WriteLine($"{t.NormalizedDescription}\t{t.Transaction.Description}"));
+// var withAsterisks = normalized.Where(t => t.NormalizedDescription.Contains('*', StringComparison.Ordinal)).ToList();
+// withAsterisks.ForEach(t => Console.WriteLine($"{t.NormalizedDescription}\t{t.Transaction.Description}"));
 
 var similarityLookup = new Dictionary<string, List<EnrichedTransaction>>(StringComparer.Ordinal);
 for (var i = 0; i < normalized.Count; i++)
@@ -48,11 +47,17 @@ for (var i = 0; i < normalized.Count; i++)
         {
             Console.WriteLine();
         }
-        var score = similarityFinder.CalculateSimilarity(needle.NormalizedDescription, haystack.NormalizedDescription);
+
+        var score = string.Equals(needle.NormalizedDescription, haystack.NormalizedDescription, StringComparison.Ordinal)
+            ? 1.0d
+            : similarityFinder.CalculateSimilarity(needle.NormalizedDescription, haystack.NormalizedDescription);
         if (score > 0.8d)
         {
             row.Add(haystack);
             normalized.RemoveAt(j);
+
+            // RemoveAt(j) automatically moves the next item in the list up, so we need to decrement so as not to skip
+            j--;
         }
     }
 }

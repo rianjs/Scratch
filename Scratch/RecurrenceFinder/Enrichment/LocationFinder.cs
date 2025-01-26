@@ -194,6 +194,37 @@ public class LocationFinder
             ["VI"] = new("", "USVI"),
             ["USVI"] = new("", "USVI"),
             ["BVI"] = new("", "BVI"),
+            ["ALLEGHENY PA"] = new("ALLEGHENY", "PA"),
+            ["BROOKLYN NY"] = new("BROOKLYN", "NY"),
+            ["CAMDEN NJ"] = new("CAMDEN", "NJ"),
+            ["CANTON OH"] = new("CANTON", "OH"),
+            ["CITRUS HEIGHTS CA"] = new("CITRUS HEIGHTS", "CA"),
+            ["DALY CITY CA"] = new("DALY CITY", "CA"),
+            ["DULUTH MN"] = new("DULUTH", "MN"),
+            ["ERIE PA"] = new("ERIE", "PA"),
+            ["FALL RIVER MA"] = new("FALL RIVER", "MA"),
+            ["FEDERAL WAY WA"] = new("FEDERAL WAY", "WA"),
+            ["FLINT MI"] = new("FLINT", "MI"),
+            ["GARY IN"] = new("GARY", "IN"),
+            ["HAMMOND IN"] = new("HAMMOND", "IN"),
+            ["LIVONIA MI"] = new("LIVONIA", "MI"),
+            ["NIAGARA FALLS NY"] = new("NIAGARA FALLS", "NY"),
+            ["NORWALK CA"] = new("NORWALK", "CA"),
+            ["PARMA OH"] = new("PARMA", "OH"),
+            ["PORTSMOUTH VA"] = new("PORTSMOUTH", "VA"),
+            ["READING PA"] = new("READING", "PA"),
+            ["ROANOKE VA"] = new("ROANOKE", "VA"),
+            ["SCRANTON PA"] = new("SCRANTON", "PA"),
+            ["SOMERVILLE MA"] = new("SOMERVILLE", "MA"),
+            ["ST JOSEPH MO"] = new("ST JOSEPH", "MO"),
+            ["TRENTON NJ"] = new("TRENTON", "NJ"),
+            ["UTICA NY"] = new("UTICA", "NY"),
+            ["WILMINGTON DE"] = new("WILMINGTON", "DE"),
+            ["YOUNGSTOWN OH"] = new("YOUNGSTOWN", "OH"),
+
+            // Testing purposes
+            ["STOW MA"] = new("STOW", "MA"),
+            ["MAYNARD MA"] = new("MAYNARD", "MA"),
         }.ToFrozenDictionary();
 
         _tokenLimit = _loc.Keys.Max(key => key.Count(c => c == ' ')) + 1;
@@ -201,29 +232,15 @@ public class LocationFinder
 
     public EnrichedTransaction Enrich(EnrichedTransaction et)
     {
-        var tokens = et.NormalizedDescription.Split(' ');
+        var desc = et.NormalizedDescription;
 
-        KeyValuePair<string, string>? bestMatch = null;
-        var start = tokens.Length - 1;
-        var limit = Math.Min(_tokenLimit, tokens.Length);
-        for (var length = 1; length <= limit; length++)
-        {
-            var sequence = string.Join(" ", tokens.Skip(start - length + 1).Take(length));
-            if (_loc.TryGetValue(sequence, out var location))
-            {
-                bestMatch = location;
-            }
-        }
-
+        var bestMatch = FindBestMatch(desc);
         if (bestMatch is null)
         {
             return et;
         }
 
-        var normalizedDescription = et.NormalizedDescription
-            .ReplaceWord(bestMatch.Value.Key, "")
-            .ReplaceWord(bestMatch.Value.Value, "");
-
+        var normalizedDescription = TrimLocation(desc, bestMatch.Value).Trim();
         return et with
         {
             City = bestMatch.Value.Key,
@@ -232,5 +249,27 @@ public class LocationFinder
         };
     }
 
+    private KeyValuePair<string, string>? FindBestMatch(string input)
+    {
+        KeyValuePair<string, string>? bestMatch = null;
+        for (var start = input.Length - 1; start >= 0; start--)
+        {
+            var sequence = input[start..];
+            if (_loc.TryGetValue(sequence, out var location))
+            {
+                bestMatch = location;
+            }
+        }
+        return bestMatch;
+    }
 
+    private string TrimLocation(string input, KeyValuePair<string, string> loc)
+    {
+        var buffer = string.IsNullOrEmpty(loc.Key) || string.IsNullOrEmpty(loc.Value)
+            ? 0
+            : 1;
+        var trimLength = loc.Key.Length + loc.Value.Length + buffer;
+        var substring = input[..^trimLength];
+        return substring;
+    }
 }
